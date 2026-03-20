@@ -1,0 +1,10 @@
+# Default reviewers for all changes
+*                       @JonusNattapong
+
+# Tool layer changes need safety review
+src/policies/           @JonusNattapong
+src/providers/          @JonusNattapong
+
+# Docs can be reviewed by anyone
+docs/                   @JonusNattapong
+*.md                    @JonusNattapong

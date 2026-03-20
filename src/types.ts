@@ -1,6 +1,12 @@
-export type AgentMode = "ask" | "plan" | "edit" | "exec";
+export type AgentMode = "ask" | "plan" | "edit" | "exec" | "review";
 
 export type ToolRisk = "safe" | "guarded" | "restricted";
+
+export interface CommandValidation {
+  valid: boolean;
+  risk: ToolRisk;
+  reason?: string;
+}
 
 export type TaskStatus =
   | "answered"
@@ -119,4 +125,17 @@ export interface FinalResponse {
     output: string;
   }[];
   risks?: string[];
+}
+
+export interface SessionTurn {
+  input: string;
+  mode: AgentMode;
+  response: FinalResponse;
+  timestamp: string;
+}
+
+export interface SessionContext {
+  turns: SessionTurn[];
+  allChangedFiles: string[];
+  cwd: string;
 }

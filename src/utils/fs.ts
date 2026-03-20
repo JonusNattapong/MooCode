@@ -20,7 +20,7 @@ export async function listFiles(rootPath: string): Promise<string[]> {
     const entries = await fs.readdir(currentPath, { withFileTypes: true });
     for (const entry of entries) {
       const absolutePath = path.join(currentPath, entry.name);
-      const relativePath = path.relative(rootPath, absolutePath) || entry.name;
+      const relativePath = path.relative(rootPath, absolutePath).replaceAll("\\", "/") || entry.name;
       if (ig.ignores(relativePath)) {
         continue;
       }

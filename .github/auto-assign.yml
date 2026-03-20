@@ -1,0 +1,9 @@
+# Auto assign config for kentaro-m/auto-assign-action
+
+addAssignees: author
+
+# Uncomment and add reviewers when you have collaborators:
+# reviewers:
+#   - username1
+#   - username2
+# numberOfReviewers: 1

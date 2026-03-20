@@ -29,6 +29,10 @@ export async function proposeReplaceTool(
 }
 
 export async function applyPatchTool(context: ToolContext, patch: ProposedPatch): Promise<ToolResult> {
+  const current = await readTextFile(context.repoRoot, patch.path);
+  if (current !== patch.before) {
+    throw new Error(`Patch drift detected: ${patch.path} changed since patch was proposed`);
+  }
   await writeTextFile(context.repoRoot, patch.path, patch.after);
   return {
     ok: true,
@@ -108,6 +112,15 @@ export async function applyMultiPatchTool(context: ToolContext, multiPatch: Mult
   const applied: string[] = [];
 
   for (const op of multiPatch.operations) {
+    if (op.type === "replace" || op.type === "delete") {
+      if (op.before !== undefined) {
+        const current = await readTextFile(context.repoRoot, op.path);
+        if (current !== op.before) {
+          throw new Error(`Patch drift detected: ${op.path} changed since patch was proposed`);
+        }
+      }
+    }
+
     if (op.type === "create") {
       await writeTextFile(context.repoRoot, op.path, op.after!);
     } else if (op.type === "replace") {

@@ -12,9 +12,16 @@ npm run build                  # compile TypeScript to dist/
 npm run check                  # type-check only (tsc --noEmit)
 npm run dev                    # run CLI via tsx (dev mode, no build needed)
 npm start                      # run compiled CLI from dist/
+
+npm run version:patch          # bump patch (0.1.0 -> 0.1.1), create git tag
+npm run version:minor          # bump minor (0.1.0 -> 0.2.0)
+npm run version:major          # bump major (0.1.0 -> 1.0.0)
+npm run release                # check + build + patch + push + tag (triggers release workflow)
 ```
 
 The `dev` script uses `tsx` for fast iteration — no separate build step required.
+
+Pushing a `v*` tag triggers the GitHub Actions release workflow (typecheck, build, GitHub Release, npm publish).
 
 **No test runner is configured yet.** There are zero test files. If you add tests, use `vitest` or `node --test` and add an `npm test` script to `package.json`. When that exists, run a single test with:
 

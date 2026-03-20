@@ -8,6 +8,7 @@ import { SessionLogger } from "../session/logger.js";
 import { createToolRegistry } from "../tools/index.js";
 import type { AgentMode, FinalResponse, MultiPatch, ProposedPatch } from "../types.js";
 import { FinalResponseSchema, validateWithSchema, SchemaValidationError } from "../schemas/index.js";
+import { printDiff } from "../utils/output.js";
 
 export interface AgentRunOptions {
   cwd: string;
@@ -67,9 +68,13 @@ export class Agent {
         if (!options.command) {
           throw new Error("Missing command for exec mode");
         }
-        safety.validateCommand(options.command);
-        await this.assertApproval(`Run command "${options.command}"?`, options.autoApprove);
+        const validation = safety.validateCommand(options.command);
+        if (!validation.valid) {
+          throw new Error(validation.reason ?? `Command blocked: ${options.command}`);
+        }
+        await this.assertApproval(`Run command "${options.command}"? (${validation.risk})`, options.autoApprove);
         const result = await tools.runCommand(options.command);
+        const data = result.data as { exitCode: number; stdout: string; stderr: string; durationMs: number; timedOut: boolean };
         const output = JSON.stringify(result.data, null, 2);
         logger.addCommandOutput(options.command, result.ok, output);
         await logger.flush(result.ok ? "validated_success" : "validated_failed");
@@ -86,16 +91,47 @@ export class Agent {
         });
       }
 
+      if (options.mode === "review") {
+        const statusResult = await tools.gitStatus();
+        const diffResult = await tools.gitDiff();
+        const statusText = statusResult.data as string;
+        const diffText = diffResult.data as string;
+
+        if (!statusText && !diffText) {
+          return this.validateFinalResponse({
+            status: "answered",
+            summary: "No uncommitted changes"
+          });
+        }
+
+        const changedFiles = statusText.split("\n").filter(Boolean).map((line) => line.slice(3));
+        await logger.flush("answered");
+        return this.validateFinalResponse({
+          status: "answered",
+          summary: `${changedFiles.length} file(s) with uncommitted changes`,
+          changedFiles
+        });
+      }
+
       if (options.mode === "edit") {
         if (options.multiPatch && options.multiPatch.length > 0) {
-          // Multi-file edit
+          // Check dirty files before multi-file edit
+          const dirtyFiles: string[] = [];
           for (const op of options.multiPatch) {
             safety.validatePath(op.path);
+            const dirtyResult = await tools.gitIsDirty(op.path);
+            if ((dirtyResult.data as { isDirty: boolean }).isDirty) {
+              dirtyFiles.push(op.path);
+            }
           }
+          if (dirtyFiles.length > 0) {
+            throw new Error(`Files have uncommitted changes and would be overwritten: ${dirtyFiles.join(", ")}`);
+          }
+
           const proposal = await tools.proposeMultiPatch(options.multiPatch);
           const data = proposal.data as { multiPatch: MultiPatch; diffs: string };
           if (data.diffs) {
-            console.log(data.diffs);
+            printDiff(data.diffs);
           }
           await this.assertApproval(`Apply ${options.multiPatch.length} operations?`, options.autoApprove);
           const applyResult = await tools.applyMultiPatch(data.multiPatch);
@@ -112,9 +148,16 @@ export class Agent {
           throw new Error("Missing patch instructions for edit mode");
         }
         safety.validatePath(options.patch.path);
+
+        // Check if file has uncommitted changes
+        const dirtyResult = await tools.gitIsDirty(options.patch.path);
+        if ((dirtyResult.data as { isDirty: boolean }).isDirty) {
+          throw new Error(`File has uncommitted changes and would be overwritten: ${options.patch.path}`);
+        }
+
         const proposal = await tools.proposeReplace(options.patch.path, options.patch.search, options.patch.replace);
         const data = proposal.data as { patch: ProposedPatch; diff: string };
-        console.log(data.diff);
+        printDiff(data.diff);
         await this.assertApproval(`Apply patch to ${options.patch.path}?`, options.autoApprove);
         const applyResult = await tools.applyPatch(data.patch);
         await logger.flush("applied_not_validated");

@@ -2,6 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Agent } from "./orchestrator/agent.js";
+import { Session } from "./orchestrator/session.js";
 import { VALID_COMMANDS } from "./config.js";
 import { resolveProvider, providerNames } from "./providers/index.js";
 import { printHeader, printJson, printKeyValue } from "./utils/output.js";
@@ -46,12 +47,14 @@ Usage:
   moocode exec --command "npm test"
   moocode edit --path README.md --search "old" --replace "new"
   moocode edit --input patches.json
+  moocode session
 
 Commands:
   ask      Ask questions about the repository (read-only)
   plan     Generate a change plan with risk assessment
   exec     Run a validation command with approval
   edit     Apply text replacements with preview and approval
+  session  Start an interactive REPL session
 
 Flags:
   --prompt <text>        Question or task description (required for ask/plan)
@@ -169,6 +172,12 @@ async function main(): Promise<void> {
       }
       const durationMs = Date.now() - startTime;
       console.log(`\nCompleted in ${durationMs}ms`);
+      return;
+    }
+
+    if (command === "session") {
+      const session = new Session(provider, cwd, Boolean(args["auto-approve"]));
+      await session.run();
       return;
     }
   } catch (error) {

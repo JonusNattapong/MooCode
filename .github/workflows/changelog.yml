@@ -1,0 +1,42 @@
+name: Changelog
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        run: |
+          echo "# Changelog" > CHANGELOG_PART.md
+          echo "" >> CHANGELOG_PART.md
+          echo "## ${{ github.event.release.tag_name }}" >> CHANGELOG_PART.md
+          echo "" >> CHANGELOG_PART.md
+          echo "${{ github.event.release.body }}" >> CHANGELOG_PART.md
+          echo "" >> CHANGELOG_PART.md
+
+      - name: Prepend to CHANGELOG.md
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            tail -n +2 CHANGELOG.md > CHANGELOG_EXISTING.md
+            cat CHANGELOG_PART.md CHANGELOG_EXISTING.md > CHANGELOG.md
+          else
+            cp CHANGELOG_PART.md CHANGELOG.md
+          fi
+
+      - name: Commit changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --cached --quiet || git commit -m "docs: update CHANGELOG.md"
+          git push
