@@ -1,0 +1,30 @@
+{
+  "name": "moocode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI-first local coding agent inspired by Claude Code workflows",
+  "license": "MIT",
+  "bin": {
+    "moocode": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --import tsx ./src/index.ts",
+    "start": "node dist/index.js",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "chalk": "^5.4.1",
+    "diff": "^7.0.0",
+    "ignore": "^7.0.4",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.1",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

@@ -1,0 +1,47 @@
+# Configuration for actions/labeler
+# Labels are applied based on file path patterns in PRs
+
+'src/tools/':
+  - changed-files:
+      - any-glob-to-any-file: 'src/tools/**'
+
+'src/providers/':
+  - changed-files:
+      - any-glob-to-any-file: 'src/providers/**'
+
+'src/context/':
+  - changed-files:
+      - any-glob-to-any-file: 'src/context/**'
+
+'src/policies/':
+  - changed-files:
+      - any-glob-to-any-file: 'src/policies/**'
+
+'src/session/':
+  - changed-files:
+      - any-glob-to-any-file: 'src/session/**'
+
+'src/schemas/':
+  - changed-files:
+      - any-glob-to-any-file: 'src/schemas/**'
+
+'src/utils/':
+  - changed-files:
+      - any-glob-to-any-file: 'src/utils/**'
+
+'docs':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '*.md'
+
+'config':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'package.json'
+          - 'tsconfig.json'
+          - '.github/**'
+
+'cli':
+  - changed-files:
+      - any-glob-to-any-file: 'src/index.ts'

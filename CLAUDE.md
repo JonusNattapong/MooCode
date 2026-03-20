@@ -1,0 +1,5 @@
+# CLAUDE.md
+
+This repository is currently a minimal workspace for `MooCode`. The `AGENTS.md` file contains the intended architecture and project layout for the `MooCode` agent implementation. It serves as a blueprint for how the codebase will be structured once development begins. The `src/` directory contains the initial scaffolding for the project, including the CLI entrypoint (`src/index.ts`), the `Agent` class orchestrator (`src/orchestrator/agent.ts`), and the `KiloProvider` implementation (`src/providers/kiloProvider.ts`). These files have been recently edited to include the provider selection logic and the API key handling for the Kilo provider. The `KiloProvider` now checks if the provided API key is a JWT token and sets the authorization header accordingly. The CLI entrypoint has been updated to accept a `--provider` argument, allowing users to specify which LLM provider to use when running the agent.
+
+AGENTS.md contains the intended architecture and project layout for the `MooCode` agent implementation. It serves as a blueprint for how the codebase will be structured once development begins.
