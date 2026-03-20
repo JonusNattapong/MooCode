@@ -34,7 +34,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version
-        run: npm version ${{ inputs.bump }} -m "release: v%s"
+        run: |
+          npm version ${{ inputs.bump }} -m "release: v%s"
 
       - name: Push tag
         run: git push && git push --tags
