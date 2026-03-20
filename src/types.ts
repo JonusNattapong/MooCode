@@ -1,3 +1,11 @@
+import type {
+  AgentPlan,
+  FinalResponse,
+  PlannedChange,
+  TaskStatus,
+  ValidationResult,
+} from "./schemas/index.js";
+
 export type AgentMode = "ask" | "plan" | "edit" | "exec" | "review";
 
 export type ToolRisk = "safe" | "guarded" | "restricted";
@@ -8,15 +16,7 @@ export interface CommandValidation {
   reason?: string;
 }
 
-export type TaskStatus =
-  | "answered"
-  | "planned"
-  | "patch_proposed"
-  | "applied_not_validated"
-  | "validated_success"
-  | "validated_failed"
-  | "blocked_by_policy"
-  | "failed";
+export type { TaskStatus, ValidationResult };
 
 export interface RepoMetadata {
   rootPath: string;
@@ -39,18 +39,7 @@ export interface WorkingSet {
   files: WorkingSetItem[];
 }
 
-export interface PlannedChange {
-  path: string;
-  reason: string;
-}
-
-export interface AgentPlan {
-  summary: string;
-  filesToInspect: string[];
-  filesToChange: PlannedChange[];
-  validation: string[];
-  risk: "low" | "medium" | "high";
-}
+export type { AgentPlan, PlannedChange };
 
 export interface ToolCallRecord {
   name: string;
@@ -114,17 +103,24 @@ export interface MultiPatch {
   summary: string;
 }
 
-export interface FinalResponse {
-  status: TaskStatus;
+export type { FinalResponse };
+
+export interface MemoryEntry {
+  content: string;
+  createdAt: string;
+  source?: string;
+}
+
+export interface MemoryStore {
+  lessons: MemoryEntry[];
+  preferences: MemoryEntry[];
+  conventions: MemoryEntry[];
+}
+
+export interface CompactedHistory {
   summary: string;
-  plan?: AgentPlan;
-  changedFiles?: string[];
-  validation?: {
-    command: string;
-    ok: boolean;
-    output: string;
-  }[];
-  risks?: string[];
+  recentTurns: SessionTurn[];
+  originalTurnCount: number;
 }
 
 export interface SessionTurn {
@@ -138,4 +134,60 @@ export interface SessionContext {
   turns: SessionTurn[];
   allChangedFiles: string[];
   cwd: string;
+}
+
+// MCP tool definitions passed to LLM providers for native tool calling
+export interface McpToolDefinition {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  server: string;
+}
+
+// Tool call returned by an LLM provider requesting execution
+export interface ProviderToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+// A message in the conversation history sent to the provider
+export interface ProviderMessage {
+  role: "user" | "assistant";
+  content: string;
+  toolCalls?: ProviderToolCall[];
+  toolResults?: Array<{
+    toolCallId: string;
+    content: string;
+    isError?: boolean;
+  }>;
+}
+
+export interface AgentRunOptions {
+  cwd: string;
+  mode: AgentMode;
+  prompt: string;
+  command?: string;
+  patch?: {
+    path: string;
+    search: string;
+    replace: string;
+  };
+  multiPatch?: Array<{
+    type: "create" | "replace" | "delete";
+    path: string;
+    content?: string;
+    search?: string;
+    replace?: string;
+    reason: string;
+  }>;
+  autoApprove?: boolean;
+  requestApproval?: (prompt: string) => Promise<boolean>;
+  history?: ProviderMessage[];
+  onChunk?: (text: string, type: "thinking" | "content") => void;
+  memoryContext?: string;
+  yolo?: boolean;
+  doubleCheck?: boolean;
+  provider?: string;
+  model?: string;
 }

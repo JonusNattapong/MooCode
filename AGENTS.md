@@ -30,58 +30,65 @@ npx vitest run path/to/file.test.ts     # single file (once vitest is added)
 npx vitest run -t "test name"           # single test by name
 ```
 
-**No linter or formatter is configured.** There is no eslint, prettier, biome, or oxlint setup. Type-checking via `npm run check` is the only code quality gate.
+**Biome is used for linting and formatting.** Run `npm run check` to validate everything.
 
 ## Project Layout
 
 ```
 src/
 ├── index.ts              # CLI entrypoint (parseArgs, main dispatch)
-├── config.ts             # constants: DEFAULT_IGNORE, DEFAULT_MODEL, VALID_COMMANDS
-├── types.ts              # all shared type definitions (AgentMode, ToolResult, etc.)
+├── config.ts             # constants and provider defaults
+├── types.ts              # shared TypeScript interfaces & types
 ├── context/
-│   ├── repoScanner.ts    # detect languages, package manager, test framework
-│   └── workingSet.ts     # score/rank files by prompt relevance
+│   ├── repoScanner.ts    # repository language/structure detection
+│   ├── workingSet.ts     # file relevance scoring
+│   └── compactor.ts      # LLM-powered context/history summarization
+├── mcp/                  # Model Context Protocol (MCP) implementation
+│   ├── client.ts         # Stdio-based JSON-RPC client (using execa)
+│   ├── sseClient.ts      # SSE-based client
+│   └── service.ts        # MCP server & tool management
+├── plugins/              # Plugin system & Marketplace
+│   ├── loader.ts         # Hot-reloading & Hook execution
+│   ├── registry.ts       # Plugin installation & storage
+│   └── marketplace.ts    # Plugin search & discovery
 ├── orchestrator/
-│   └── agent.ts          # Agent class: run() dispatches by mode, approval flow
+│   ├── agent.ts          # Core agent loop with Tool & Hook integration
+│   └── session.ts        # REPL session & history management
 ├── policies/
-│   └── safetyGate.ts     # path confinement, command blocklist, approval rules
+│   └── safetyGate.ts     # Path & command validation logic
 ├── providers/
-│   ├── provider.ts       # Provider interface
-│   ├── index.ts          # provider registry + resolveProvider()
-│   ├── anthropicProvider.ts  # Anthropic SDK integration
-│   └── kiloProvider.ts   # Kilo API (OpenAI-compatible fetch)
+│   ├── anthropicProvider.ts # Anthropic SDK integration
+│   └── kiloProvider.ts      # Kilo API integration
 ├── schemas/
-│   └── index.ts          # Zod schemas + SchemaValidationError class
-├── session/
-│   └── logger.ts         # SessionLogger: writes JSON logs to .session/
+│   └── index.ts          # Zod schemas for runtime validation
 ├── tools/
-│   ├── index.ts          # ToolRegistry interface + createToolRegistry()
-│   ├── readTools.ts      # listFiles, readFile, searchCode (ripgrep)
-│   ├── writeTools.ts     # proposeReplace (diff), applyPatch
-│   ├── gitTools.ts       # gitStatus, gitDiff
-│   └── commandTools.ts   # runCommand (child_process.exec)
-├── types/
-│   └── diff.d.ts         # ambient module declaration for diff lib
+│   ├── index.ts          # Tool registry & LSP integration
+│   ├── lspClient.ts      # Language Server Protocol client
+│   └── *Tools.ts         # Specialized tool implementations (git, fs, etc.)
 └── utils/
-    ├── fs.ts             # pathExists, listFiles, readTextFile, writeTextFile
-    └── output.ts         # printHeader, printKeyValue, printJson (chalk)
+    ├── configStore.ts    # Persistent user configuration (conf)
+    ├── fs.ts             # Optimized file I/O (globby)
+    ├── output.ts         # Terminal UI formatting (chalk, ora)
+    └── slashCommands.ts  # REPL slash command handlers
 ```
 
 ## Code Style
 
 ### Imports
+
 - Use `node:` prefix for built-in modules: `import fs from "node:fs/promises"`, `import path from "node:path"`
 - Use `.js` extensions for relative imports: `import { Agent } from "./orchestrator/agent.js"`
 - Use `import type` for type-only imports: `import type { ToolContext, ToolResult } from "../types.js"`
 - Group imports: built-ins first, then third-party, then local
 
 ### Module System
+
 - ESM only (`"type": "module"` in package.json)
 - TypeScript with `NodeNext` module resolution
 - Strict mode enabled (`"strict": true`)
 
 ### Types
+
 - Define shared types in `src/types.ts`; prefer interfaces for object shapes, type aliases for unions
 - Use Zod schemas in `src/schemas/index.ts` for runtime validation of LLM output
 - Infer validated types from Zod schemas: `type ValidatedAgentPlan = z.infer<typeof AgentPlanSchema>`
@@ -89,6 +96,7 @@ src/
 - Use `satisfies` for exhaustive union checks (see `agent.ts` mode dispatch)
 
 ### Naming
+
 - Files: `camelCase.ts` (e.g., `repoScanner.ts`, `readTools.ts`)
 - Interfaces/Types/Classes: `PascalCase` (e.g., `ToolRegistry`, `AgentRunOptions`)
 - Functions/variables: `camelCase` (e.g., `createToolRegistry`, `resolveProvider`)
@@ -96,6 +104,7 @@ src/
 - Boolean props: `is`/`has`/`auto` prefix (e.g., `autoApprove`, `isConfigured`)
 
 ### Functions & Patterns
+
 - Use `async`/`await` for all I/O; no callbacks or raw Promises
 - Factory functions over singletons: `createToolRegistry(context)`, `resolveProvider(name)`
 - Classes for stateful components (Agent, SessionLogger); plain functions for stateless logic
@@ -103,6 +112,7 @@ src/
 - Export interfaces and factory functions from barrel `index.ts` files
 
 ### Error Handling
+
 - Throw `Error` with descriptive messages for user-facing failures
 - Use custom error classes for structured errors: `SchemaValidationError` with `issues` array
 - Top-level `main().catch()` sets `process.exitCode = 1` and prints `error.message`
@@ -110,6 +120,7 @@ src/
 - Distinguish recoverable warnings (`console.warn`) from fatal errors (`throw`)
 
 ### Formatting
+
 - 2-space indentation
 - Double quotes for strings
 - Trailing commas in multi-line structures
@@ -118,6 +129,7 @@ src/
 - No comments unless the code is genuinely non-obvious
 
 ### General Guidelines
+
 - Prefer small, focused changes over large refactors
 - Keep the dependency list minimal — check `package.json` before adding new deps
 - Use `chalk` (v5, ESM) for terminal output formatting

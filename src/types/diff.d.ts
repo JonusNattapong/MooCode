@@ -4,6 +4,6 @@ declare module "diff" {
     oldStr: string,
     newStr: string,
     oldHeader?: string,
-    newHeader?: string
+    newHeader?: string,
   ): string;
 }

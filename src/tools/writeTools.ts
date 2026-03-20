@@ -1,12 +1,23 @@
 import { createPatch } from "diff";
-import { readTextFile, writeTextFile, deleteFile, pathExists } from "../utils/fs.js";
-import type { MultiPatch, PatchOperation, ProposedPatch, ToolContext, ToolResult } from "../types.js";
+import type {
+  MultiPatch,
+  PatchOperation,
+  ProposedPatch,
+  ToolContext,
+  ToolResult,
+} from "../types.js";
+import {
+  deleteFile,
+  pathExists,
+  readTextFile,
+  writeTextFile,
+} from "../utils/fs.js";
 
 export async function proposeReplaceTool(
   context: ToolContext,
   targetPath: string,
   searchValue: string,
-  replaceValue: string
+  replaceValue: string,
 ): Promise<ToolResult> {
   const before = await readTextFile(context.repoRoot, targetPath);
   if (!before.includes(searchValue)) {
@@ -16,34 +27,46 @@ export async function proposeReplaceTool(
   const patch: ProposedPatch = {
     path: targetPath,
     before,
-    after
+    after,
   };
   return {
     ok: true,
     summary: `Prepared patch for ${targetPath}`,
     data: {
       patch,
-      diff: createPatch(targetPath, before, after)
-    }
+      diff: createPatch(targetPath, before, after),
+    },
   };
 }
 
-export async function applyPatchTool(context: ToolContext, patch: ProposedPatch): Promise<ToolResult> {
+export async function applyPatchTool(
+  context: ToolContext,
+  patch: ProposedPatch,
+): Promise<ToolResult> {
   const current = await readTextFile(context.repoRoot, patch.path);
   if (current !== patch.before) {
-    throw new Error(`Patch drift detected: ${patch.path} changed since patch was proposed`);
+    throw new Error(
+      `Patch drift detected: ${patch.path} changed since patch was proposed`,
+    );
   }
   await writeTextFile(context.repoRoot, patch.path, patch.after);
   return {
     ok: true,
     summary: `Applied patch to ${patch.path}`,
-    data: { path: patch.path }
+    data: { path: patch.path },
   };
 }
 
 export async function proposeMultiPatchTool(
   context: ToolContext,
-  operations: Array<{ type: "create" | "replace" | "delete"; path: string; content?: string; search?: string; replace?: string; reason: string }>
+  operations: Array<{
+    type: "create" | "replace" | "delete";
+    path: string;
+    content?: string;
+    search?: string;
+    replace?: string;
+    reason: string;
+  }>,
 ): Promise<ToolResult> {
   const proposed: PatchOperation[] = [];
 
@@ -61,11 +84,13 @@ export async function proposeMultiPatchTool(
         risk: "guarded",
         reason: op.reason,
         before: undefined,
-        after: op.content
+        after: op.content,
       });
     } else if (op.type === "replace") {
       if (op.search === undefined || op.replace === undefined) {
-        throw new Error(`Replace operation on ${op.path} requires search and replace`);
+        throw new Error(
+          `Replace operation on ${op.path} requires search and replace`,
+        );
       }
       const before = await readTextFile(context.repoRoot, op.path);
       if (!before.includes(op.search)) {
@@ -78,7 +103,7 @@ export async function proposeMultiPatchTool(
         risk: "guarded",
         reason: op.reason,
         before,
-        after
+        after,
       });
     } else if (op.type === "delete") {
       const before = await readTextFile(context.repoRoot, op.path);
@@ -88,27 +113,38 @@ export async function proposeMultiPatchTool(
         risk: "restricted",
         reason: op.reason,
         before,
-        after: undefined
+        after: undefined,
       });
     } else {
       throw new Error(`Unknown operation type: ${(op as any).type}`);
     }
   }
 
-  const multiPatch: MultiPatch = { operations: proposed, summary: `${proposed.length} operations proposed` };
+  const multiPatch: MultiPatch = {
+    operations: proposed,
+    summary: `${proposed.length} operations proposed`,
+  };
   const diffs = proposed
-    .filter((op) => op.type !== "delete" && op.before !== undefined && op.after !== undefined)
+    .filter(
+      (op) =>
+        op.type !== "delete" &&
+        op.before !== undefined &&
+        op.after !== undefined,
+    )
     .map((op) => createPatch(op.path, op.before!, op.after!))
     .join("\n");
 
   return {
     ok: true,
     summary: multiPatch.summary,
-    data: { multiPatch, diffs }
+    data: { multiPatch, diffs },
   };
 }
 
-export async function applyMultiPatchTool(context: ToolContext, multiPatch: MultiPatch): Promise<ToolResult> {
+export async function applyMultiPatchTool(
+  context: ToolContext,
+  multiPatch: MultiPatch,
+): Promise<ToolResult> {
   const applied: string[] = [];
 
   for (const op of multiPatch.operations) {
@@ -116,7 +152,9 @@ export async function applyMultiPatchTool(context: ToolContext, multiPatch: Mult
       if (op.before !== undefined) {
         const current = await readTextFile(context.repoRoot, op.path);
         if (current !== op.before) {
-          throw new Error(`Patch drift detected: ${op.path} changed since patch was proposed`);
+          throw new Error(
+            `Patch drift detected: ${op.path} changed since patch was proposed`,
+          );
         }
       }
     }
@@ -134,6 +172,6 @@ export async function applyMultiPatchTool(context: ToolContext, multiPatch: Mult
   return {
     ok: true,
     summary: `Applied ${applied.length} operations`,
-    data: { changedFiles: applied }
+    data: { changedFiles: applied },
   };
 }

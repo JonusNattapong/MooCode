@@ -1,6 +1,6 @@
-import { listFiles, readTextFile } from "../utils/fs.js";
-import type { WorkingSet, WorkingSetItem } from "../types.js";
 import { DEFAULT_IGNORE } from "../config.js";
+import type { WorkingSet, WorkingSetItem } from "../types.js";
+import { listFiles, readTextFile } from "../utils/fs.js";
 
 // High-value file patterns
 const CONFIG_PATTERNS = [
@@ -14,7 +14,7 @@ const CONFIG_PATTERNS = [
   /jest\.config/,
   /vitest\.config/,
   /\.env$/,
-  /\.env\.example$/
+  /\.env\.example$/,
 ];
 
 const ENTRYPOINT_PATTERNS = [
@@ -22,7 +22,7 @@ const ENTRYPOINT_PATTERNS = [
   /main\.[jt]sx?$/,
   /app\.[jt]sx?$/,
   /server\.[jt]sx?$/,
-  /client\.[jt]sx?$/
+  /client\.[jt]sx?$/,
 ];
 
 const TEST_PATTERNS = [
@@ -30,7 +30,7 @@ const TEST_PATTERNS = [
   /\.spec\.[jt]sx?$/,
   /__tests__\//,
   /tests?\//,
-  /spec\//
+  /spec\//,
 ];
 
 // Generated file patterns to ignore
@@ -42,7 +42,7 @@ const GENERATED_PATTERNS = [
   /dist\//,
   /build\//,
   /coverage\//,
-  /node_modules\//
+  /node_modules\//,
 ];
 
 // Maximum file size to consider (50KB)
@@ -68,12 +68,11 @@ function analyzeFile(path: string, content: string): FileAnalysis {
     /(?:export\s+)?interface\s+(\w+)/g,
     /(?:export\s+)?type\s+(\w+)/g,
     /(?:export\s+)?const\s+(\w+)/g,
-    /(?:export\s+)?enum\s+(\w+)/g
+    /(?:export\s+)?enum\s+(\w+)/g,
   ];
 
   for (const pattern of symbolPatterns) {
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
+    for (const match of content.matchAll(pattern)) {
       symbols.push(match[1].toLowerCase());
     }
   }
@@ -81,26 +80,30 @@ function analyzeFile(path: string, content: string): FileAnalysis {
   // Extract imports
   const importPatterns = [
     /import\s+.*?from\s+['"]([^'"]+)['"]/g,
-    /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+    /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
   ];
 
   for (const pattern of importPatterns) {
-    let match;
-    while ((match = pattern.exec(content)) !== null) {
+    for (const match of content.matchAll(pattern)) {
       imports.push(match[1].toLowerCase());
     }
   }
 
   // Check file types
-  const isConfig = CONFIG_PATTERNS.some(p => p.test(path));
-  const isEntrypoint = ENTRYPOINT_PATTERNS.some(p => p.test(path));
-  const isTest = TEST_PATTERNS.some(p => p.test(path));
-  const isGenerated = GENERATED_PATTERNS.some(p => p.test(path));
+  const isConfig = CONFIG_PATTERNS.some((p) => p.test(path));
+  const isEntrypoint = ENTRYPOINT_PATTERNS.some((p) => p.test(path));
+  const isTest = TEST_PATTERNS.some((p) => p.test(path));
+  const isGenerated = GENERATED_PATTERNS.some((p) => p.test(path));
 
   return { symbols, imports, isConfig, isEntrypoint, isTest, isGenerated };
 }
 
-function scoreFile(prompt: string, path: string, content: string, analysis: FileAnalysis): number {
+function scoreFile(
+  prompt: string,
+  path: string,
+  content: string,
+  analysis: FileAnalysis,
+): number {
   const tokens = prompt.toLowerCase().split(/\s+/).filter(Boolean);
   let score = 0;
 
@@ -114,14 +117,14 @@ function scoreFile(prompt: string, path: string, content: string, analysis: File
 
   // Bonus for symbol matches
   for (const token of tokens) {
-    if (analysis.symbols.some(s => s.includes(token))) {
+    if (analysis.symbols.some((s) => s.includes(token))) {
       score += 3;
     }
   }
 
   // Bonus for import matches
   for (const token of tokens) {
-    if (analysis.imports.some(i => i.includes(token))) {
+    if (analysis.imports.some((i) => i.includes(token))) {
       score += 2;
     }
   }
@@ -137,9 +140,13 @@ function scoreFile(prompt: string, path: string, content: string, analysis: File
   return Math.max(0, score);
 }
 
-function extractSnippet(content: string, tokens: string[], maxLines = 30): string {
-  const lines = content.split('\n');
-  const tokenSet = new Set(tokens.map(t => t.toLowerCase()));
+function extractSnippet(
+  content: string,
+  tokens: string[],
+  maxLines = 30,
+): string {
+  const lines = content.split("\n");
+  const tokenSet = new Set(tokens.map((t) => t.toLowerCase()));
 
   // Find lines containing tokens
   const relevantLineIndices: number[] = [];
@@ -155,7 +162,7 @@ function extractSnippet(content: string, tokens: string[], maxLines = 30): strin
 
   if (relevantLineIndices.length === 0) {
     // No matches, return first chunk
-    return lines.slice(0, maxLines).join('\n');
+    return lines.slice(0, maxLines).join("\n");
   }
 
   // Find the best window of lines
@@ -183,17 +190,21 @@ function extractSnippet(content: string, tokens: string[], maxLines = 30): strin
   }
 
   const snippetEnd = Math.min(lines.length, bestStart + maxLines);
-  return lines.slice(bestStart, snippetEnd).join('\n');
+  return lines.slice(bestStart, snippetEnd).join("\n");
 }
 
-export async function buildWorkingSet(rootPath: string, prompt: string, limit = 8): Promise<WorkingSet> {
+export async function buildWorkingSet(
+  rootPath: string,
+  prompt: string,
+  limit = 8,
+): Promise<WorkingSet> {
   const files = await listFiles(rootPath);
   const tokens = prompt.toLowerCase().split(/\s+/).filter(Boolean);
   const ranked: WorkingSetItem[] = [];
 
   for (const file of files.slice(0, 500)) {
     // Skip generated files early
-    if (GENERATED_PATTERNS.some(p => p.test(file))) {
+    if (GENERATED_PATTERNS.some((p) => p.test(file))) {
       continue;
     }
 
@@ -213,9 +224,13 @@ export async function buildWorkingSet(rootPath: string, prompt: string, limit = 
       if (analysis.isConfig) reason = "Configuration file";
       else if (analysis.isEntrypoint) reason = "Entrypoint file";
       else if (analysis.isTest) reason = "Test file";
-      else if (analysis.symbols.some(s => tokens.some(t => s.includes(t)))) {
+      else if (
+        analysis.symbols.some((s) => tokens.some((t) => s.includes(t)))
+      ) {
         reason = "Contains matching symbols";
-      } else if (analysis.imports.some(i => tokens.some(t => i.includes(t)))) {
+      } else if (
+        analysis.imports.some((i) => tokens.some((t) => i.includes(t)))
+      ) {
         reason = "Imports matching modules";
       }
 
@@ -226,7 +241,7 @@ export async function buildWorkingSet(rootPath: string, prompt: string, limit = 
         path: file,
         reason,
         score,
-        snippet
+        snippet,
       });
     }
   }

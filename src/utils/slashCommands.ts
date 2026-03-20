@@ -1,17 +1,23 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
-import { printHeader, printKeyValue, printJson, printDivider, colorize } from "./output.js";
-
-const execAsync = promisify(exec);
+import { execa } from "execa";
+import {
+  colorize,
+  printDivider,
+  printHeader,
+  printJson,
+  printKeyValue,
+} from "./output.js";
 
 export interface SlashCommandContext {
   cwd: string;
   sessionId?: string;
 }
 
-export type SlashCommandHandler = (ctx: SlashCommandContext, args: string[]) => Promise<void>;
+export type SlashCommandHandler = (
+  ctx: SlashCommandContext,
+  args: string[],
+) => Promise<void>;
 
 export interface SlashCommand {
   name: string;
@@ -21,9 +27,12 @@ export interface SlashCommand {
 
 async function handleStatus(ctx: SlashCommandContext): Promise<void> {
   printHeader("Repository Status");
-  
+
   try {
-    const { stdout } = await execAsync("git status --short", { cwd: ctx.cwd });
+    const { stdout } = await execa("git status --short", {
+      shell: true,
+      cwd: ctx.cwd,
+    });
     if (stdout.trim()) {
       console.log(colorize("Changes:", "yellow"));
       console.log(stdout);
@@ -31,14 +40,22 @@ async function handleStatus(ctx: SlashCommandContext): Promise<void> {
       console.log(colorize("Working tree clean", "green"));
     }
 
-    const { stdout: branch } = await execAsync("git branch --show-current", { cwd: ctx.cwd });
+    const { stdout: branch } = await execa("git branch --show-current", {
+      shell: true,
+      cwd: ctx.cwd,
+    });
     printKeyValue("Branch", branch.trim());
 
-    const { stdout: remote } = await execAsync("git remote -v | head -1", { cwd: ctx.cwd }).catch(() => ({ stdout: "none" }));
+    const { stdout: remote } = await execa("git remote -v | head -1", {
+      shell: true,
+      cwd: ctx.cwd,
+    }).catch(() => ({ stdout: "none" }));
     printKeyValue("Remote", remote.trim() || "none");
 
-    // Show recent commits
-    const { stdout: commits } = await execAsync("git log --oneline -5", { cwd: ctx.cwd }).catch(() => ({ stdout: "" }));
+    const { stdout: commits } = await execa("git log --oneline -5", {
+      shell: true,
+      cwd: ctx.cwd,
+    }).catch(() => ({ stdout: "" }));
     if (commits.trim()) {
       console.log("\n" + colorize("Recent commits:", "cyan"));
       console.log(commits);
@@ -63,13 +80,19 @@ async function handleStatus(ctx: SlashCommandContext): Promise<void> {
   }
 }
 
-async function handleDiff(ctx: SlashCommandContext, args: string[]): Promise<void> {
+async function handleDiff(
+  ctx: SlashCommandContext,
+  args: string[],
+): Promise<void> {
   const staged = args.includes("--staged");
   printHeader(staged ? "Staged Changes" : "Working Directory Changes");
 
   try {
     const flag = staged ? "--cached" : "";
-    const { stdout } = await execAsync(`git diff ${flag} --stat`, { cwd: ctx.cwd });
+    const { stdout } = await execa(`git diff ${flag} --stat`, {
+      shell: true,
+      cwd: ctx.cwd,
+    });
     if (!stdout.trim()) {
       console.log(colorize("No changes", "green"));
       return;
@@ -78,7 +101,10 @@ async function handleDiff(ctx: SlashCommandContext, args: string[]): Promise<voi
     console.log(colorize("Summary:", "yellow"));
     console.log(stdout);
 
-    const { stdout: fullDiff } = await execAsync(`git diff ${flag}`, { cwd: ctx.cwd });
+    const { stdout: fullDiff } = await execa(`git diff ${flag}`, {
+      shell: true,
+      cwd: ctx.cwd,
+    });
     if (fullDiff.trim()) {
       printDivider();
       console.log(colorize("Full diff:", "cyan"));
@@ -91,20 +117,25 @@ async function handleDiff(ctx: SlashCommandContext, args: string[]): Promise<voi
 
 async function handleApprove(ctx: SlashCommandContext): Promise<void> {
   printHeader("Approval Status");
-  console.log(colorize("This command is used during interactive sessions", "yellow"));
+  console.log(
+    colorize("This command is used during interactive sessions", "yellow"),
+  );
   console.log("When prompted for approval, type 'y' or 'yes' to proceed");
   console.log("Or use --auto-approve flag to skip prompts");
 }
 
-async function handleLogs(ctx: SlashCommandContext, args: string[]): Promise<void> {
-  const limit = parseInt(args.find(a => !isNaN(Number(a))) ?? "10", 10);
+async function handleLogs(
+  ctx: SlashCommandContext,
+  args: string[],
+): Promise<void> {
+  const limit = parseInt(args.find((a) => !isNaN(Number(a))) ?? "10", 10);
   printHeader(`Recent Session Logs (last ${limit})`);
 
   const sessionDir = path.join(ctx.cwd, ".session");
   try {
     const files = await fs.readdir(sessionDir);
     const logFiles = files
-      .filter(f => f.endsWith(".json"))
+      .filter((f) => f.endsWith(".json"))
       .sort((a, b) => {
         const aTime = parseInt(a.replace(".json", ""), 10);
         const bTime = parseInt(b.replace(".json", ""), 10);
@@ -120,15 +151,18 @@ async function handleLogs(ctx: SlashCommandContext, args: string[]): Promise<voi
     for (const file of logFiles) {
       const content = await fs.readFile(path.join(sessionDir, file), "utf8");
       const log = JSON.parse(content);
-      
+
       printDivider();
       printKeyValue("ID", log.id);
       printKeyValue("Mode", log.mode);
       printKeyValue("Status", log.status);
-      printKeyValue("Prompt", log.prompt.slice(0, 60) + (log.prompt.length > 60 ? "..." : ""));
+      printKeyValue(
+        "Prompt",
+        log.prompt.slice(0, 60) + (log.prompt.length > 60 ? "..." : ""),
+      );
       printKeyValue("Duration", `${log.durationMs ?? 0}ms`);
       printKeyValue("Created", log.createdAt);
-      
+
       if (log.toolCalls?.length > 0) {
         console.log(colorize(`  Tool calls: ${log.toolCalls.length}`, "cyan"));
       }
@@ -143,13 +177,13 @@ async function handleLogs(ctx: SlashCommandContext, args: string[]): Promise<voi
 
 async function handleHelp(): Promise<void> {
   printHeader("Available Slash Commands");
-  
+
   const commands = [
     { name: "/status", desc: "Show repository and session status" },
     { name: "/diff [--staged]", desc: "Show git diff" },
     { name: "/approve", desc: "Show approval instructions" },
     { name: "/logs [count]", desc: "Show recent session logs" },
-    { name: "/help", desc: "Show this help message" }
+    { name: "/help", desc: "Show this help message" },
   ];
 
   for (const cmd of commands) {
@@ -159,24 +193,40 @@ async function handleHelp(): Promise<void> {
 
 export function createSlashCommands(): SlashCommand[] {
   return [
-    { name: "/status", description: "Show repository and session status", handler: handleStatus },
+    {
+      name: "/status",
+      description: "Show repository and session status",
+      handler: handleStatus,
+    },
     { name: "/diff", description: "Show git diff", handler: handleDiff },
-    { name: "/approve", description: "Show approval instructions", handler: handleApprove },
-    { name: "/logs", description: "Show recent session logs", handler: handleLogs },
-    { name: "/help", description: "Show available commands", handler: handleHelp }
+    {
+      name: "/approve",
+      description: "Show approval instructions",
+      handler: handleApprove,
+    },
+    {
+      name: "/logs",
+      description: "Show recent session logs",
+      handler: handleLogs,
+    },
+    {
+      name: "/help",
+      description: "Show available commands",
+      handler: handleHelp,
+    },
   ];
 }
 
 export async function executeSlashCommand(
   input: string,
-  ctx: SlashCommandContext
+  ctx: SlashCommandContext,
 ): Promise<boolean> {
   const commands = createSlashCommands();
   const parts = input.trim().split(/\s+/);
   const cmdName = parts[0];
   const args = parts.slice(1);
 
-  const command = commands.find(c => c.name === cmdName);
+  const command = commands.find((c) => c.name === cmdName);
   if (!command) {
     return false;
   }

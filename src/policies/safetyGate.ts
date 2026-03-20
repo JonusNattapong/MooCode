@@ -1,6 +1,6 @@
 import path from "node:path";
-import type { ToolRisk } from "../types.js";
 import { ECOSYSTEM_COMMANDS, NETWORK_COMMAND_PATTERNS } from "../config.js";
+import type { ToolRisk } from "../types.js";
 
 const BLOCKED_COMMAND_PATTERNS = [
   /\brm\s+-rf\b/,
@@ -9,7 +9,7 @@ const BLOCKED_COMMAND_PATTERNS = [
   /\bmkfs\b/,
   /\bshutdown\b/,
   /\breboot\b/,
-  /curl\s+.*\|\s*sh/
+  /curl\s+.*\|\s*sh/,
 ];
 
 export interface CommandValidation {
@@ -38,7 +38,7 @@ export class SafetyGate {
         return {
           valid: false,
           risk: "restricted",
-          reason: `Blocked command by safety policy: ${command}`
+          reason: `Blocked command by safety policy: ${command}`,
         };
       }
     }
@@ -49,7 +49,7 @@ export class SafetyGate {
         return {
           valid: false,
           risk: "restricted",
-          reason: `Network-sensitive command blocked by default: ${command}`
+          reason: `Network-sensitive command blocked by default: ${command}`,
         };
       }
     }
@@ -60,7 +60,7 @@ export class SafetyGate {
       return {
         valid: true,
         risk: "safe",
-        reason: "Command is allowlisted for detected ecosystem"
+        reason: "Command is allowlisted for detected ecosystem",
       };
     }
 
@@ -68,7 +68,7 @@ export class SafetyGate {
     return {
       valid: true,
       risk: "guarded",
-      reason: "Command not in allowlist, requires approval"
+      reason: "Command not in allowlist, requires approval",
     };
   }
 

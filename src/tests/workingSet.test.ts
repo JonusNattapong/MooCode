@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { buildWorkingSet } from "../context/workingSet";
 import { createFixture, SAMPLE_PROJECT } from "./fixtures";
 
@@ -40,7 +40,7 @@ describe("workingSet", () => {
     const files = {
       ...SAMPLE_PROJECT,
       "src/types.d.ts": "export type Foo = string;",
-      "src/bundle.min.js": "console.log(1);"
+      "src/bundle.min.js": "console.log(1);",
     };
     const fixture = await createFixture(files);
     cleanup = fixture.cleanup;
@@ -53,7 +53,11 @@ describe("workingSet", () => {
   it("respects the limit parameter", async () => {
     const fixture = await createFixture(SAMPLE_PROJECT);
     cleanup = fixture.cleanup;
-    const ws = await buildWorkingSet(fixture.root, "index utils greet hello", 2);
+    const ws = await buildWorkingSet(
+      fixture.root,
+      "index utils greet hello",
+      2,
+    );
     expect(ws.files.length).toBeLessThanOrEqual(2);
   });
 

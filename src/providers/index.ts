@@ -1,12 +1,17 @@
-import type { Provider } from "./provider.js";
-import { KiloProvider } from "./kiloProvider.js";
 import { AnthropicProvider } from "./anthropicProvider.js";
+import { KiloProvider } from "./kiloProvider.js";
+import type { Provider } from "./provider.js";
 
-export type { Provider } from "./provider.js";
+export type {
+  AskWithToolsResult,
+  ChatMessage,
+  Provider,
+  StreamChunkType,
+} from "./provider.js";
 
 const providers: Record<string, () => Provider> = {
   kilo: () => new KiloProvider(),
-  anthropic: () => new AnthropicProvider()
+  anthropic: () => new AnthropicProvider(),
 };
 
 export const providerNames = Object.keys(providers);
@@ -14,11 +19,24 @@ export const providerNames = Object.keys(providers);
 export function resolveProvider(name: string): Provider {
   const factory = providers[name];
   if (!factory) {
-    throw new Error(`Unknown provider: ${name}. Available: ${providerNames.join(", ")}`);
+    throw new Error(
+      `Unknown provider: ${name}. Available: ${providerNames.join(", ")}`,
+    );
   }
-  const provider = factory();
-  if (!provider.isConfigured()) {
-    throw new Error(`Provider "${name}" is not configured`);
+  return factory();
+}
+
+export function resolveDefaultProvider(preferredName?: string): Provider {
+  if (preferredName) {
+    return resolveProvider(preferredName);
   }
-  return provider;
+
+  for (const name of providerNames) {
+    const provider = resolveProvider(name);
+    if (provider.isConfigured()) {
+      return provider;
+    }
+  }
+
+  return resolveProvider("kilo");
 }

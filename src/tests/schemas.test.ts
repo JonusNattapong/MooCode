@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { AgentPlanSchema, FinalResponseSchema, SchemaValidationError, validateWithSchema } from "../schemas/index";
+import { describe, expect, it } from "vitest";
+import {
+  AgentPlanSchema,
+  FinalResponseSchema,
+  SchemaValidationError,
+  validateWithSchema,
+} from "../schemas/index";
 
 describe("schemas", () => {
   describe("AgentPlanSchema", () => {
@@ -9,7 +14,7 @@ describe("schemas", () => {
         filesToInspect: ["src/parser.ts"],
         filesToChange: [{ path: "src/parser.ts", reason: "contains the bug" }],
         validation: ["npm run check"],
-        risk: "low" as const
+        risk: "low" as const,
       };
       const result = validateWithSchema(AgentPlanSchema, plan, "plan");
       expect(result.summary).toBe("Fix bug in parser");
@@ -21,9 +26,11 @@ describe("schemas", () => {
         filesToInspect: ["src/a.ts"],
         filesToChange: [],
         validation: [],
-        risk: "low" as const
+        risk: "low" as const,
       };
-      expect(() => validateWithSchema(AgentPlanSchema, plan, "plan")).toThrow(SchemaValidationError);
+      expect(() => validateWithSchema(AgentPlanSchema, plan, "plan")).toThrow(
+        SchemaValidationError,
+      );
     });
 
     it("rejects plan with empty filesToInspect", () => {
@@ -32,9 +39,11 @@ describe("schemas", () => {
         filesToInspect: [],
         filesToChange: [],
         validation: [],
-        risk: "low" as const
+        risk: "low" as const,
       };
-      expect(() => validateWithSchema(AgentPlanSchema, plan, "plan")).toThrow(SchemaValidationError);
+      expect(() => validateWithSchema(AgentPlanSchema, plan, "plan")).toThrow(
+        SchemaValidationError,
+      );
     });
 
     it("rejects plan with invalid risk", () => {
@@ -43,17 +52,27 @@ describe("schemas", () => {
         filesToInspect: ["a.ts"],
         filesToChange: [],
         validation: [],
-        risk: "critical"
+        risk: "critical",
       };
-      expect(() => validateWithSchema(AgentPlanSchema, plan, "plan")).toThrow(SchemaValidationError);
+      expect(() => validateWithSchema(AgentPlanSchema, plan, "plan")).toThrow(
+        SchemaValidationError,
+      );
     });
 
     it("rejects plan with missing fields", () => {
-      expect(() => validateWithSchema(AgentPlanSchema, {}, "plan")).toThrow(SchemaValidationError);
+      expect(() => validateWithSchema(AgentPlanSchema, {}, "plan")).toThrow(
+        SchemaValidationError,
+      );
     });
 
     it("SchemaValidationError includes issues", () => {
-      const plan = { summary: "", filesToInspect: [], filesToChange: [], validation: [], risk: "low" };
+      const plan = {
+        summary: "",
+        filesToInspect: [],
+        filesToChange: [],
+        validation: [],
+        risk: "low",
+      };
       try {
         validateWithSchema(AgentPlanSchema, plan, "plan");
         expect.unreachable();
@@ -82,8 +101,8 @@ describe("schemas", () => {
           filesToInspect: ["a.ts"],
           filesToChange: [],
           validation: [],
-          risk: "low" as const
-        }
+          risk: "low" as const,
+        },
       };
       const result = validateWithSchema(FinalResponseSchema, resp, "response");
       expect(result.plan).toBeDefined();
@@ -91,12 +110,16 @@ describe("schemas", () => {
 
     it("rejects invalid status", () => {
       const resp = { status: "invalid", summary: "test" };
-      expect(() => validateWithSchema(FinalResponseSchema, resp, "response")).toThrow(SchemaValidationError);
+      expect(() =>
+        validateWithSchema(FinalResponseSchema, resp, "response"),
+      ).toThrow(SchemaValidationError);
     });
 
     it("rejects missing summary", () => {
       const resp = { status: "answered" };
-      expect(() => validateWithSchema(FinalResponseSchema, resp, "response")).toThrow(SchemaValidationError);
+      expect(() =>
+        validateWithSchema(FinalResponseSchema, resp, "response"),
+      ).toThrow(SchemaValidationError);
     });
   });
 
@@ -109,7 +132,7 @@ describe("schemas", () => {
 
     it("throws SchemaValidationError on failure", () => {
       expect(() =>
-        validateWithSchema(FinalResponseSchema, null, "test")
+        validateWithSchema(FinalResponseSchema, null, "test"),
       ).toThrow(SchemaValidationError);
     });
   });

@@ -1,8 +1,29 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { McpService } from "../mcp/service.js";
 import type { MultiPatch, ToolContext, ToolResult } from "../types.js";
 import { runCommandTool } from "./commandTools.js";
-import { gitAddTool, gitCommitTool, gitDiffFileTool, gitDiffTool, gitIsDirtyTool, gitStatusTool } from "./gitTools.js";
+import {
+  gitAddTool,
+  gitCommitTool,
+  gitDiffFileTool,
+  gitDiffTool,
+  gitIsDirtyTool,
+  gitStatusTool,
+} from "./gitTools.js";
+import {
+  documentSymbolsTool,
+  findReferencesTool,
+  goToDefinitionTool,
+  hoverTool,
+} from "./lspClient.js";
 import { listFilesTool, readFileTool, searchCodeTool } from "./readTools.js";
-import { applyPatchTool, applyMultiPatchTool, proposeMultiPatchTool, proposeReplaceTool } from "./writeTools.js";
+import {
+  applyMultiPatchTool,
+  applyPatchTool,
+  proposeMultiPatchTool,
+  proposeReplaceTool,
+} from "./writeTools.js";
 
 export interface ToolRegistry {
   listFiles(maxResults?: number): Promise<ToolResult>;
@@ -18,13 +39,52 @@ export interface ToolRegistry {
   runTests(pattern?: string): Promise<ToolResult>;
   runLint(fixer?: boolean): Promise<ToolResult>;
   runBuild(): Promise<ToolResult>;
-  proposeReplace(targetPath: string, searchValue: string, replaceValue: string): Promise<ToolResult>;
-  applyPatch(patch: { path: string; before: string; after: string }): Promise<ToolResult>;
-  proposeMultiPatch(operations: Array<{ type: "create" | "replace" | "delete"; path: string; content?: string; search?: string; replace?: string; reason: string }>): Promise<ToolResult>;
+  proposeReplace(
+    targetPath: string,
+    searchValue: string,
+    replaceValue: string,
+  ): Promise<ToolResult>;
+  applyPatch(patch: {
+    path: string;
+    before: string;
+    after: string;
+  }): Promise<ToolResult>;
+  proposeMultiPatch(
+    operations: Array<{
+      type: "create" | "replace" | "delete";
+      path: string;
+      content?: string;
+      search?: string;
+      replace?: string;
+      reason: string;
+    }>,
+  ): Promise<ToolResult>;
   applyMultiPatch(multiPatch: MultiPatch): Promise<ToolResult>;
+  listMcpServers(): Promise<ToolResult>;
+  listMcpTools(serverName?: string): Promise<ToolResult>;
+  callMcpTool(
+    server: string,
+    tool: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult>;
+  goToDefinition(
+    filePath: string,
+    line: number,
+    character: number,
+  ): Promise<ToolResult>;
+  findReferences(
+    filePath: string,
+    line: number,
+    character: number,
+    includeDeclaration?: boolean,
+  ): Promise<ToolResult>;
+  hover(filePath: string, line: number, character: number): Promise<ToolResult>;
+  documentSymbols(filePath: string): Promise<ToolResult>;
 }
 
 export function createToolRegistry(context: ToolContext): ToolRegistry {
+  const mcp = new McpService(context);
+
   return {
     listFiles: (maxResults) => listFilesTool(context, maxResults),
     readFile: (targetPath) => readFileTool(context, targetPath),
@@ -35,45 +95,98 @@ export function createToolRegistry(context: ToolContext): ToolRegistry {
     gitCommit: (message) => gitCommitTool(context, message),
     gitIsDirty: (filePath) => gitIsDirtyTool(context, filePath),
     gitDiffFile: (filePath) => gitDiffFileTool(context, filePath),
-    runCommand: (command, timeoutMs) => runCommandTool(context, command, timeoutMs),
+    runCommand: (command, timeoutMs) =>
+      runCommandTool(context, command, timeoutMs),
     runTests: (pattern) => runTestsTool(context, pattern),
     runLint: (fixer) => runLintTool(context, fixer),
     runBuild: () => runBuildTool(context),
     proposeReplace: (targetPath, searchValue, replaceValue) =>
       proposeReplaceTool(context, targetPath, searchValue, replaceValue),
     applyPatch: (patch) => applyPatchTool(context, patch),
-    proposeMultiPatch: (operations) => proposeMultiPatchTool(context, operations),
-    applyMultiPatch: (multiPatch) => applyMultiPatchTool(context, multiPatch)
+    proposeMultiPatch: (operations) =>
+      proposeMultiPatchTool(context, operations),
+    applyMultiPatch: (multiPatch) => applyMultiPatchTool(context, multiPatch),
+    listMcpServers: async () => {
+      const servers = await mcp.listServers();
+      return {
+        ok: true,
+        summary: `Found ${servers.length} MCP server(s)`,
+        data: servers,
+      };
+    },
+    listMcpTools: async (serverName) => {
+      const tools = await mcp.listTools(serverName);
+      return {
+        ok: true,
+        summary: `Found ${tools.length} MCP tool(s)`,
+        data: tools,
+      };
+    },
+    callMcpTool: async (server, tool, args) =>
+      await mcp.callTool(server, tool, args),
+    goToDefinition: (filePath, line, character) =>
+      goToDefinitionTool(context, filePath, line, character),
+    findReferences: (filePath, line, character, includeDeclaration) =>
+      findReferencesTool(
+        context,
+        filePath,
+        line,
+        character,
+        includeDeclaration,
+      ),
+    hover: (filePath, line, character) =>
+      hoverTool(context, filePath, line, character),
+    documentSymbols: (filePath) => documentSymbolsTool(context, filePath),
   };
 }
 
-async function runTestsTool(context: ToolContext, pattern?: string): Promise<ToolResult> {
+async function runTestsTool(
+  context: ToolContext,
+  pattern?: string,
+): Promise<ToolResult> {
   const { packageManager, testFramework } = await getPackageManager(context);
 
   let command: string;
-  if (pattern) {
-    if (testFramework === "vitest" || testFramework === "jest") {
-      command = `${packageManager} run test -- ${pattern}`;
-    } else if (testFramework === "pytest") {
-      command = `${packageManager} run test ${pattern}`;
-    } else {
-      command = `${packageManager} test ${pattern}`;
-    }
+
+  if (testFramework === "pytest") {
+    command = pattern ? `pytest ${pattern}` : "pytest";
+  } else if (packageManager === "cargo") {
+    command = pattern ? `cargo test ${pattern}` : "cargo test";
+  } else if (packageManager === "go") {
+    command = pattern ? `go test ${pattern}` : "go test ./...";
+  } else if (testFramework === "vitest" || testFramework === "jest") {
+    command = pattern
+      ? `${packageManager} run test -- ${pattern}`
+      : `${packageManager} test`;
   } else {
-    command = `${packageManager} test`;
+    // Default JS behavior
+    command = pattern
+      ? `${packageManager} test ${pattern}`
+      : `${packageManager} test`;
   }
 
   return runCommandTool(context, command);
 }
 
-async function runLintTool(context: ToolContext, fixer = false): Promise<ToolResult> {
+async function runLintTool(
+  context: ToolContext,
+  fixer = false,
+): Promise<ToolResult> {
   const { packageManager } = await getPackageManager(context);
 
   let command: string;
-  if (fixer) {
-    command = `${packageManager} run lint -- --fix`;
+
+  if (packageManager === "python") {
+    command = "ruff check ."; // Default for python projects in this agent
+  } else if (packageManager === "cargo") {
+    command = fixer ? "cargo clippy --fix" : "cargo clippy";
+  } else if (packageManager === "go") {
+    command = "go vet ./...";
   } else {
-    command = `${packageManager} run lint`;
+    // JS ecosystem
+    command = fixer
+      ? `${packageManager} run lint -- --fix`
+      : `${packageManager} run lint`;
   }
 
   return runCommandTool(context, command);
@@ -81,22 +194,42 @@ async function runLintTool(context: ToolContext, fixer = false): Promise<ToolRes
 
 async function runBuildTool(context: ToolContext): Promise<ToolResult> {
   const { packageManager } = await getPackageManager(context);
-  const command = `${packageManager} run build`;
+
+  let command: string;
+  if (packageManager === "cargo") {
+    command = "cargo build";
+  } else if (packageManager === "go") {
+    command = "go build ./...";
+  } else if (packageManager === "python") {
+    command = "python -m build";
+  } else {
+    command = `${packageManager} run build`;
+  }
+
   return runCommandTool(context, command);
 }
+
+// Simple memoization for package manager detection
+const packageManagerCache = new Map<
+  string,
+  { packageManager: string; testFramework: string | null }
+>();
 
 async function getPackageManager(context: ToolContext): Promise<{
   packageManager: string;
   testFramework: string | null;
 }> {
-  const fs = await import("node:fs/promises");
-  const path = await import("node:path");
+  const cached = packageManagerCache.get(context.repoRoot);
+  if (cached) return cached;
 
   const pkgPath = path.join(context.repoRoot, "package.json");
   let testFramework: string | null = null;
+  let packageManager = "npm";
+  let hasPackageJson = false;
 
   try {
     const pkg = JSON.parse(await fs.readFile(pkgPath, "utf-8"));
+    hasPackageJson = true;
 
     if (pkg.devDependencies?.vitest || pkg.dependencies?.vitest) {
       testFramework = "vitest";
@@ -107,46 +240,46 @@ async function getPackageManager(context: ToolContext): Promise<{
     // Ignore if package.json doesn't exist
   }
 
-  // Check for Python
-  try {
-    await fs.access(path.join(context.repoRoot, "pyproject.toml"));
-    return { packageManager: "python", testFramework: "pytest" };
-  } catch {
-    // Ignore
-  }
-
-  // Check for Cargo
-  try {
-    await fs.access(path.join(context.repoRoot, "Cargo.toml"));
-    return { packageManager: "cargo", testFramework: null };
-  } catch {
-    // Ignore
-  }
-
-  // Check for Go
-  try {
-    await fs.access(path.join(context.repoRoot, "go.mod"));
-    return { packageManager: "go", testFramework: null };
-  } catch {
-    // Ignore
-  }
-
-  // Check for pnpm
+  // Priority 1: Check JS lockfiles (most specific)
   try {
     await fs.access(path.join(context.repoRoot, "pnpm-lock.yaml"));
-    return { packageManager: "pnpm", testFramework };
+    packageManager = "pnpm";
   } catch {
-    // Ignore
+    try {
+      await fs.access(path.join(context.repoRoot, "yarn.lock"));
+      packageManager = "yarn";
+    } catch {
+      // Stay with default npm if package.json exists
+    }
   }
 
-  // Check for yarn
-  try {
-    await fs.access(path.join(context.repoRoot, "yarn.lock"));
-    return { packageManager: "yarn", testFramework };
-  } catch {
-    // Ignore
+  // Priority 2: Check other languages if no JS project OR if specifically found
+  if (!hasPackageJson) {
+    try {
+      await fs.access(path.join(context.repoRoot, "pyproject.toml"));
+      const result = { packageManager: "python", testFramework: "pytest" };
+      packageManagerCache.set(context.repoRoot, result);
+      return result;
+    } catch {
+      try {
+        await fs.access(path.join(context.repoRoot, "Cargo.toml"));
+        const result = { packageManager: "cargo", testFramework: null };
+        packageManagerCache.set(context.repoRoot, result);
+        return result;
+      } catch {
+        try {
+          await fs.access(path.join(context.repoRoot, "go.mod"));
+          const result = { packageManager: "go", testFramework: null };
+          packageManagerCache.set(context.repoRoot, result);
+          return result;
+        } catch {
+          // Fall back to npm
+        }
+      }
+    }
   }
 
-  // Default to npm
-  return { packageManager: "npm", testFramework };
+  const finalResult = { packageManager, testFramework };
+  packageManagerCache.set(context.repoRoot, finalResult);
+  return finalResult;
 }

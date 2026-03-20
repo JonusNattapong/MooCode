@@ -1,11 +1,13 @@
-import { listFiles } from "../utils/fs.js";
 import type { RepoMetadata } from "../types.js";
+import { listFiles } from "../utils/fs.js";
 
 function detectLanguages(files: string[]): string[] {
   const languages = new Set<string>();
   for (const file of files) {
-    if (file.endsWith(".ts") || file.endsWith(".tsx")) languages.add("typescript");
-    if (file.endsWith(".js") || file.endsWith(".jsx")) languages.add("javascript");
+    if (file.endsWith(".ts") || file.endsWith(".tsx"))
+      languages.add("typescript");
+    if (file.endsWith(".js") || file.endsWith(".jsx"))
+      languages.add("javascript");
     if (file.endsWith(".py")) languages.add("python");
     if (file.endsWith(".go")) languages.add("go");
     if (file.endsWith(".rs")) languages.add("rust");
@@ -24,7 +26,7 @@ export async function scanRepository(rootPath: string): Promise<RepoMetadata> {
       "tsconfig.json",
       "pyproject.toml",
       "Cargo.toml",
-      "go.mod"
+      "go.mod",
     ].includes(file);
   });
 
@@ -50,7 +52,9 @@ export async function scanRepository(rootPath: string): Promise<RepoMetadata> {
     packageManager,
     testFramework,
     lintConfig: files.filter((file) => /eslint|ruff|biome|prettier/.test(file)),
-    buildConfig: files.filter((file) => /vite|tsconfig|webpack|rollup|pyproject|Cargo/.test(file)),
-    importantFiles
+    buildConfig: files.filter((file) =>
+      /vite|tsconfig|webpack|rollup|pyproject|Cargo/.test(file),
+    ),
+    importantFiles,
   };
 }

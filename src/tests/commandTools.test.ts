@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCommandTool } from "../tools/commandTools";
 import type { ToolContext } from "../types";
 import { createFixture } from "./fixtures";
@@ -31,7 +31,10 @@ describe("commandTools", () => {
     const fixture = await createFixture({});
     cleanup = fixture.cleanup;
     const ctx: ToolContext = { repoRoot: fixture.root };
-    const result = await runCommandTool(ctx, "node -e \"process.stderr.write('err'); process.exit(1)\"");
+    const result = await runCommandTool(
+      ctx,
+      "node -e \"process.stderr.write('err'); process.exit(1)\"",
+    );
     expect(result.ok).toBe(false);
     const data = result.data as any;
     expect(data.stderr).toBe("err");
@@ -42,7 +45,7 @@ describe("commandTools", () => {
     const fixture = await createFixture({});
     cleanup = fixture.cleanup;
     const ctx: ToolContext = { repoRoot: fixture.root };
-    const result = await runCommandTool(ctx, "node -e \"process.exit(42)\"");
+    const result = await runCommandTool(ctx, 'node -e "process.exit(42)"');
     expect(result.ok).toBe(false);
     const data = result.data as any;
     expect(data.exitCode).toBe(42);
@@ -62,7 +65,11 @@ describe("commandTools", () => {
     const fixture = await createFixture({});
     cleanup = fixture.cleanup;
     const ctx: ToolContext = { repoRoot: fixture.root };
-    const result = await runCommandTool(ctx, "node -e \"setTimeout(() => {}, 10000)\"", 500);
+    const result = await runCommandTool(
+      ctx,
+      'node -e "setTimeout(() => {}, 10000)"',
+      500,
+    );
     expect(result.ok).toBe(false);
     expect(result.summary).toContain("timed out");
   }, 10000);
@@ -71,7 +78,10 @@ describe("commandTools", () => {
     const fixture = await createFixture({});
     cleanup = fixture.cleanup;
     const ctx: ToolContext = { repoRoot: fixture.root };
-    const result = await runCommandTool(ctx, "node -e \"for(let i=0;i<20000;i++)console.log('x'.repeat(100))\"");
+    const result = await runCommandTool(
+      ctx,
+      "node -e \"for(let i=0;i<20000;i++)console.log('x'.repeat(100))\"",
+    );
     const data = result.data as any;
     expect(data.stdout.length).toBeLessThan(2_000_000);
   }, 15000);
@@ -80,7 +90,10 @@ describe("commandTools", () => {
     const fixture = await createFixture({ "marker.txt": "here" });
     cleanup = fixture.cleanup;
     const ctx: ToolContext = { repoRoot: fixture.root };
-    const result = await runCommandTool(ctx, "node -e \"process.stdout.write(require('fs').readFileSync('marker.txt','utf8'))\"");
+    const result = await runCommandTool(
+      ctx,
+      "node -e \"process.stdout.write(require('fs').readFileSync('marker.txt','utf8'))\"",
+    );
     expect(result.ok).toBe(true);
     const data = result.data as any;
     expect(data.stdout).toBe("here");

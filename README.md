@@ -4,12 +4,16 @@ CLI-first local coding agent inspired by Claude Code workflows. MooCode inspects
 
 ## Features
 
-- **Four modes**: `ask`, `plan`, `edit`, `exec` — from read-only exploration to safe code mutation
+- **Five modes**: `ask`, `plan`, `edit`, `exec`, `session` — from read-only exploration to safe code mutation and interactive REPL
 - **Dual provider support**: Kilo (default) and Anthropic Claude for structured plan generation
 - **Automatic repo scanning**: detects languages, package manager, test framework, and important files
 - **Safety-first**: path confinement, secret file blocking, command blocklist, and interactive approval
 - **Structured output**: Zod-validated schemas for all model responses with heuristic fallback
 - **Session logging**: every run is recorded to `.session/<id>.json` for debugging
+- **MCP support**: connect project-scoped stdio MCP servers through `.mcp.json`
+- **Plugin system**: extend with custom tools, commands, and hooks (install from GitHub or local paths)
+- **Context compaction**: LLM-powered conversation summarization to reduce token usage in long sessions
+- **Auto-memory**: persistent lessons, preferences, and conventions stored in `.moocode/memory.md`
 
 ## Quick Start
 
@@ -31,6 +35,9 @@ node dist/index.js edit --path src/index.ts --search "old" --replace "new"
 # Run a validation command
 node dist/index.js exec --command "npm run check"
 
+# List configured MCP servers
+node dist/index.js mcp --list
+
 # Skip approval prompts
 node dist/index.js edit --path README.md --search "foo" --replace "bar" --auto-approve
 ```
@@ -42,6 +49,7 @@ npm run dev -- ask --prompt "Explain this repo"
 npm run dev -- plan --prompt "Add tests for the scanner"
 npm run dev -- exec --command "npm run check"
 npm run dev -- edit --path README.md --search "old" --replace "new"
+npm run dev -- mcp --list
 ```
 
 ## Commands
@@ -52,6 +60,9 @@ npm run dev -- edit --path README.md --search "old" --replace "new"
 | `plan` | Generates a structured change plan via the LLM provider. | No |
 | `edit` | Applies a text replacement to a file after showing a unified diff. | Yes |
 | `exec` | Runs a shell command after safety validation. | Yes |
+| `session` | Start an interactive REPL session with TUI | No |
+| `mcp` | Lists or calls configured MCP servers/tools. | No |
+| `plugin` | Manage plugins (install, uninstall, list, search). | No |
 
 ### Flags
 
@@ -62,9 +73,17 @@ npm run dev -- edit --path README.md --search "old" --replace "new"
 | `--path <file>` | Target file path (required for `edit`) |
 | `--search <text>` | Text to find in the target file (required for `edit`) |
 | `--replace <text>` | Replacement text (optional, defaults to empty string) |
+| `--list` | List configured MCP servers or tools |
+| `--server <name>` | MCP server name for `mcp` |
+| `--tool <name>` | MCP tool to call |
+| `--args <json>` | JSON object passed to an MCP tool call |
 | `--cwd <path>` | Working directory (defaults to current directory) |
 | `--provider <name>` | LLM provider: `kilo` (default) or `anthropic` |
 | `--auto-approve` | Skip interactive `[y/N]` approval prompts |
+| `--input <file>` | JSON file with multi-file patch operations |
+| `--install <source>` | Install plugin from GitHub (`owner/repo`) or local path |
+| `--uninstall <name>` | Uninstall a plugin by name |
+| `--search <query>` | Search marketplace for plugins |
 
 ## Providers
 
@@ -88,6 +107,44 @@ export ANTHROPIC_MODEL="claude-3-5-sonnet-latest"  # optional, this is the defau
 ### Fallback behavior
 
 If no API key is configured, or if the LLM response fails to parse or validate, both providers generate a heuristic plan from the working set. This means `plan` mode always returns a usable result even without API access.
+
+## MCP Support
+
+MooCode can load project-local stdio MCP servers from `.mcp.json` in the repo root.
+
+Example:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token-here"
+      }
+    }
+  }
+}
+```
+
+CLI usage:
+
+```bash
+moocode mcp --list
+moocode mcp --server github
+moocode mcp --server github --tool search_issues --args '{"query":"is:open label:bug"}'
+```
+
+Interactive session usage:
+
+```text
+/mcp
+/mcp tools github
+/mcp call github search_issues {"query":"is:open label:bug"}
+```
+
+See `.mcp.json.example` for a starter config.
 
 ## Safety
 
@@ -119,34 +176,52 @@ The `.session/` directory is gitignored.
 
 ```
 src/
-├── index.ts                CLI entrypoint
-├── config.ts               Constants and defaults
-├── types.ts                Shared type definitions
+├── index.ts                  CLI entrypoint
+├── config.ts                 Constants and defaults
+├── types.ts                  Shared type definitions
 ├── context/
-│   ├── repoScanner.ts      Language and framework detection
-│   └── workingSet.ts       File ranking by prompt relevance
+│   ├── repoScanner.ts        Language and framework detection
+│   ├── workingSet.ts         File ranking by prompt relevance
+│   ├── compactor.ts          LLM-powered context compaction
+│   └── memoryStore.ts        Persistent auto-memory (.moocode/memory.md)
 ├── orchestrator/
-│   └── agent.ts            Task routing and approval flow
+│   ├── agent.ts              Task routing, approval, plugin hooks
+│   ├── session.ts            Interactive REPL with TUI (blessed)
+│   └── sessionContent.ts     TUI art and copy
 ├── policies/
-│   └── safetyGate.ts       Path and command safety rules
+│   └── safetyGate.ts         Path and command safety rules
 ├── providers/
-│   ├── provider.ts         Provider interface
-│   ├── index.ts            Provider registry
+│   ├── provider.ts           Provider interface
+│   ├── index.ts              Provider registry
 │   ├── anthropicProvider.ts  Claude integration
-│   └── kiloProvider.ts     Kilo API integration
+│   └── kiloProvider.ts       Kilo API integration
 ├── schemas/
-│   └── index.ts            Zod schemas and validation errors
+│   └── index.ts              Zod schemas and validation errors
 ├── session/
-│   └── logger.ts           Session audit logger
+│   └── logger.ts             Session audit logger
+├── mcp/
+│   ├── service.ts            MCP server management
+│   ├── client.ts             stdio JSON-RPC client
+│   ├── sseClient.ts          SSE-based MCP client
+│   ├── config.ts             .mcp.json loader
+│   └── types.ts              MCP type definitions
+├── plugins/
+│   ├── service.ts            Plugin lifecycle (install/uninstall/hooks)
+│   ├── loader.ts             Hot-load hooks/tools/commands
+│   ├── registry.ts           Plugin installation storage
+│   ├── marketplace.ts        GitHub plugin discovery
+│   └── schema.ts             Plugin manifest validation
 ├── tools/
-│   ├── index.ts            Tool registry
-│   ├── readTools.ts        listFiles, readFile, searchCode
-│   ├── writeTools.ts       proposeReplace, applyPatch
-│   ├── gitTools.ts         gitStatus, gitDiff
-│   └── commandTools.ts     runCommand
+│   ├── index.ts              Tool registry
+│   ├── readTools.ts          listFiles, readFile, searchCode
+│   ├── writeTools.ts         proposeReplace, applyPatch
+│   ├── gitTools.ts           gitStatus, gitDiff
+│   └── commandTools.ts       runCommand (via execa)
 └── utils/
-    ├── fs.ts               Filesystem helpers
-    └── output.ts           Terminal formatting
+    ├── fs.ts                 Filesystem helpers (globby)
+    ├── output.ts             Terminal formatting
+    ├── configStore.ts        Persistent user config (conf)
+    └── slashCommands.ts      REPL slash command handlers
 ```
 
 ## Development

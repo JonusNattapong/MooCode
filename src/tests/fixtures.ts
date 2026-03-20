@@ -1,12 +1,14 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 
 export interface FixtureFiles {
   [relativePath: string]: string;
 }
 
-export async function createFixture(files: FixtureFiles): Promise<{ root: string; cleanup: () => Promise<void> }> {
+export async function createFixture(
+  files: FixtureFiles,
+): Promise<{ root: string; cleanup: () => Promise<void> }> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "moocode-test-"));
 
   for (const [rel, content] of Object.entries(files)) {
@@ -17,7 +19,7 @@ export async function createFixture(files: FixtureFiles): Promise<{ root: string
 
   return {
     root,
-    cleanup: () => fs.rm(root, { recursive: true, force: true })
+    cleanup: () => fs.rm(root, { recursive: true, force: true }),
   };
 }
 
@@ -30,12 +32,12 @@ export const SAMPLE_PROJECT: FixtureFiles = {
     "",
     "export function main() {",
     '  console.log(greet("world"));',
-    "}"
+    "}",
   ].join("\n"),
   "src/utils.ts": [
     "export function greet(name: string): string {",
-    '  return `Hello, ${name}!`;',
-    "}"
+    "  return `Hello, ${name}!`;",
+    "}",
   ].join("\n"),
   "src/index.test.ts": [
     'import { describe, it, expect } from "vitest";',
@@ -45,8 +47,8 @@ export const SAMPLE_PROJECT: FixtureFiles = {
     '  it("returns greeting", () => {',
     '    expect(greet("test")).toBe("Hello, test!");',
     "  });",
-    "});"
+    "});",
   ].join("\n"),
   "README.md": "# Sample Project\nA test fixture.",
-  ".gitignore": "node_modules\ndist"
+  ".gitignore": "node_modules\ndist",
 };

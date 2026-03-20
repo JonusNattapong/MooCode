@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { SafetyGate } from "../policies/safetyGate";
 import { createFixture } from "./fixtures";
 
@@ -10,7 +10,12 @@ afterEach(async () => {
 });
 
 describe("safetyGate", () => {
-  async function setup(files: Record<string, string> = { "src/index.ts": "export {};", ".env": "KEY=val" }) {
+  async function setup(
+    files: Record<string, string> = {
+      "src/index.ts": "export {};",
+      ".env": "KEY=val",
+    },
+  ) {
     const fixture = await createFixture(files);
     cleanup = fixture.cleanup;
     gate = new SafetyGate(fixture.root);
@@ -30,12 +35,16 @@ describe("safetyGate", () => {
 
     it("blocks paths that escape repo root", async () => {
       await setup();
-      expect(() => gate!.validatePath("../outside.ts")).toThrow("escapes repository root");
+      expect(() => gate!.validatePath("../outside.ts")).toThrow(
+        "escapes repository root",
+      );
     });
 
     it("blocks absolute paths outside repo", async () => {
       await setup();
-      expect(() => gate!.validatePath("/etc/passwd")).toThrow("escapes repository root");
+      expect(() => gate!.validatePath("/etc/passwd")).toThrow(
+        "escapes repository root",
+      );
     });
 
     it("blocks .env files", async () => {
@@ -45,12 +54,16 @@ describe("safetyGate", () => {
 
     it("blocks .env.local files", async () => {
       await setup();
-      expect(() => gate!.validatePath(".env.local")).toThrow("secret-like file");
+      expect(() => gate!.validatePath(".env.local")).toThrow(
+        "secret-like file",
+      );
     });
 
     it("blocks .env.production files", async () => {
       await setup();
-      expect(() => gate!.validatePath(".env.production")).toThrow("secret-like file");
+      expect(() => gate!.validatePath(".env.production")).toThrow(
+        "secret-like file",
+      );
     });
 
     it("allows non-env files", async () => {

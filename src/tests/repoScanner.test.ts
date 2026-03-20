@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { scanRepository } from "../context/repoScanner";
 import { createFixture, SAMPLE_PROJECT } from "./fixtures";
 
@@ -54,7 +54,7 @@ describe("repoScanner", () => {
     const files = {
       "main.py": "print('hello')",
       "pyproject.toml": "[project]\nname = 'test'",
-      "requirements.txt": "flask"
+      "requirements.txt": "flask",
     };
     const fixture = await createFixture(files);
     cleanup = fixture.cleanup;

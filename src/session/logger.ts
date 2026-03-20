@@ -1,6 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { AgentMode, SessionLog, TaskStatus, ToolCallRecord } from "../types.js";
+import type {
+  AgentMode,
+  SessionLog,
+  TaskStatus,
+  ToolCallRecord,
+} from "../types.js";
 
 export interface SessionLogExtended extends SessionLog {
   startedAt: string;
@@ -30,7 +35,7 @@ export class SessionLogger {
       notes: [],
       status: "failed",
       selectedFiles: [],
-      commandOutputs: []
+      commandOutputs: [],
     };
   }
 
@@ -51,6 +56,15 @@ export class SessionLogger {
       this.log.commandOutputs = [];
     }
     this.log.commandOutputs.push({ command, ok, output });
+  }
+
+  error(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    this.log.notes.push(`ERROR: ${message}`);
+    if (stack) {
+      this.log.notes.push(`STACK: ${stack}`);
+    }
   }
 
   async flush(status: TaskStatus): Promise<void> {
