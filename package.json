@@ -40,10 +40,10 @@
     "@biomejs/biome": "^2.4.8",
     "@types/blessed": "^0.1.25",
     "@types/diff": "^7.0.1",
-    "@types/node": "^24.0.0",
+    "@types/node": "^25.5.0",
     "@types/prompts": "^2.4.9",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.0"
   }
 }
