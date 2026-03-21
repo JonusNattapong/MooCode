@@ -289,6 +289,7 @@ async function main(): Promise<void> {
           doubleCheck: Boolean(args["double-check"]),
         });
         printHeader(result.status);
+        printKeyValue("summary:", result.summary);
         printChangedFiles(result.changedFiles ?? []);
         printFooter();
       } else {
@@ -307,6 +308,7 @@ async function main(): Promise<void> {
           doubleCheck: Boolean(args["double-check"]),
         });
         printHeader(result.status);
+        printKeyValue("summary:", result.summary);
         printChangedFiles(result.changedFiles ?? []);
         printFooter();
       }

@@ -228,11 +228,13 @@ export class Agent {
               }
             }
 
-            // For replace/delete ops, check dirty status
+            // For replace/delete ops, check dirty status (skip if auto-approve is used)
             if (op.type === "replace" || op.type === "delete") {
-              const dirtyResult = await tools.gitIsDirty(op.path);
-              if ((dirtyResult.data as { isDirty: boolean }).isDirty) {
-                dirtyFiles.push(op.path);
+              if (!(options.autoApprove || options.yolo)) {
+                const dirtyResult = await tools.gitIsDirty(op.path);
+                if ((dirtyResult.data as { isDirty: boolean }).isDirty) {
+                  dirtyFiles.push(op.path);
+                }
               }
             }
           }
@@ -270,12 +272,14 @@ export class Agent {
         }
         safety.validatePath(options.patch.path);
 
-        // Check if file has uncommitted changes
-        const dirtyResult = await tools.gitIsDirty(options.patch.path);
-        if ((dirtyResult.data as { isDirty: boolean }).isDirty) {
-          throw new Error(
-            `File has uncommitted changes and would be overwritten: ${options.patch.path}`,
-          );
+        // Check if file has uncommitted changes (skip if auto-approve is used)
+        if (!(options.autoApprove || options.yolo)) {
+          const dirtyResult = await tools.gitIsDirty(options.patch.path);
+          if ((dirtyResult.data as { isDirty: boolean }).isDirty) {
+            throw new Error(
+              `File has uncommitted changes and would be overwritten: ${options.patch.path}`,
+            );
+          }
         }
 
         const proposal = await tools.proposeReplace(
@@ -476,7 +480,8 @@ export class Agent {
             });
             messages.push({
               role: "user",
-              content: "I've reviewed your response. Please double-check it against the original requirements and any tool outputs. Are you sure you've addressed everything correctly and completely? If you find any missing parts or errors, please correct them now using your tools or by providing an updated response. If you are 100% sure everything is perfect, provide your final response.",
+              content:
+                "I've reviewed your response. Please double-check it against the original requirements and any tool outputs. Are you sure you've addressed everything correctly and completely? If you find any missing parts or errors, please correct them now using your tools or by providing an updated response. If you are 100% sure everything is perfect, provide your final response.",
             });
             continue; // Go for one more iteration
           }
